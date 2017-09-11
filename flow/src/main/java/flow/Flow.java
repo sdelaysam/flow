@@ -206,14 +206,24 @@ public final class Flow {
    * Replaces the history with the given key and dispatches in the given direction.
    */
   public void replaceHistory(@NonNull final Object key, @NonNull final Direction direction) {
-    setHistory(getHistory().buildUpon().clear().push(key).build(), direction);
+    move(new PendingTraversal() {
+      @Override
+      void doExecute() {
+        dispatch(getHistory().buildUpon().clear().push(key).build(), direction);
+      }
+    });
   }
 
   /**
    * Replaces the top key of the history with the given key and dispatches in the given direction.
    */
   public void replaceTop(@NonNull final Object key, @NonNull final Direction direction) {
-    setHistory(getHistory().buildUpon().pop(1).push(key).build(), direction);
+    move(new PendingTraversal() {
+      @Override
+      void doExecute() {
+        dispatch(getHistory().buildUpon().pop(1).push(key).build(), direction);
+      }
+    });
   }
 
   /**

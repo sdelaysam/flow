@@ -18,6 +18,7 @@ package flow.sample.intents;
 
 import android.app.Activity;
 import android.content.Context;
+
 import flow.Flow;
 
 public class IntentsStandardSampleActivity extends Activity {
@@ -28,8 +29,6 @@ public class IntentsStandardSampleActivity extends Activity {
   }
 
   @Override public void onBackPressed() {
-    if (!Flow.get(this).goBack()) {
-      super.onBackPressed();
-    }
+    Flow.get(this).goBack();
   }
 }

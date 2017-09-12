@@ -30,6 +30,9 @@ import java.util.List;
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 public class FlowTest {
@@ -55,6 +58,7 @@ public class FlowTest {
   final TestKey noPersist = new NoPersist();
 
   @Mock KeyManager keyManager;
+  @Mock HistoryCallback historyCallback;
   History lastStack;
   Direction lastDirection;
 
@@ -106,6 +110,7 @@ public class FlowTest {
     History history = History.single(new Uno());
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(new FlowDispatcher());
+    flow.setHistoryCallback(historyCallback);
 
     flow.set(new Dos());
     assertThat(lastStack.top()).isInstanceOf(Dos.class);
@@ -115,15 +120,18 @@ public class FlowTest {
     assertThat(lastStack.top()).isInstanceOf(Tres.class);
     assertThat(lastDirection).isSameAs(Direction.FORWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isInstanceOf(Dos.class);
     assertThat(lastDirection).isSameAs(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isInstanceOf(Uno.class);
     assertThat(lastDirection).isSameAs(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isFalse();
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void historyChangesAfterListenerCall() {
@@ -158,14 +166,18 @@ public class FlowTest {
 
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(new FlowDispatcher());
+    flow.setHistoryCallback(historyCallback);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(baker);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(able);
 
-    assertThat(flow.goBack()).isFalse();
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void setHistoryWorks() {
@@ -173,15 +185,18 @@ public class FlowTest {
     Flow flow = new Flow(keyManager, history);
     FlowDispatcher dispatcher = new FlowDispatcher();
     flow.setDispatcher(dispatcher);
+    flow.setHistoryCallback(historyCallback);
 
     History newHistory =
         History.emptyBuilder().pushAll(Arrays.<Object>asList(charlie, delta)).build();
     flow.setHistory(newHistory, Direction.FORWARD);
     assertThat(lastDirection).isSameAs(Direction.FORWARD);
     assertThat(lastStack.top()).isSameAs(delta);
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isSameAs(charlie);
-    assertThat(flow.goBack()).isFalse();
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void setObjectGoesBack() {
@@ -189,6 +204,7 @@ public class FlowTest {
         History.emptyBuilder().pushAll(Arrays.<Object>asList(able, baker, charlie, delta)).build();
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(new FlowDispatcher());
+    flow.setHistoryCallback(historyCallback);
 
     assertThat(history.size()).isEqualTo(4);
 
@@ -197,21 +213,25 @@ public class FlowTest {
     assertThat(lastStack.size()).isEqualTo(3);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(baker);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(able);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isFalse();
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void setObjectToMissingObjectPushes() {
     History history = History.emptyBuilder().pushAll(Arrays.<Object>asList(able, baker)).build();
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(new FlowDispatcher());
+    flow.setHistoryCallback(historyCallback);
     assertThat(history.size()).isEqualTo(2);
 
     flow.set(charlie);
@@ -219,14 +239,18 @@ public class FlowTest {
     assertThat(lastStack.size()).isEqualTo(3);
     assertThat(lastDirection).isEqualTo(Direction.FORWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(baker);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(able);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
-    assertThat(flow.goBack()).isFalse();
+
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void setObjectKeepsOriginal() {
@@ -410,6 +434,7 @@ public class FlowTest {
         .build();
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(new FlowDispatcher());
+    flow.setHistoryCallback(historyCallback);
 
     assertThat(history.size()).isEqualTo(4);
 
@@ -418,15 +443,18 @@ public class FlowTest {
     assertThat(lastStack.size()).isEqualTo(3);
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(new Picky("Baker"));
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
     assertThat(lastStack.top()).isEqualTo(new Picky("Able"));
     assertThat(lastDirection).isEqualTo(Direction.BACKWARD);
 
-    assertThat(flow.goBack()).isFalse();
+    flow.goBack();
+    verify(historyCallback, times(1)).onHistoryCleared();
   }
 
   @Test public void incorrectFlowGetUsage() {
@@ -480,161 +508,230 @@ public class FlowTest {
   }
 
   @Test
-  public void testComplexFlow() {
+  public void shouldTerminateInPendingTraversal() {
     AsyncDispatcher dispatcher = Mockito.spy(new AsyncDispatcher());
     History history = History.single(able);
     Flow flow = new Flow(keyManager, history);
     flow.setDispatcher(dispatcher);
+    flow.setHistoryCallback(historyCallback);
     dispatcher.fire();
 
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-    // forward to projects list complete
-    dispatcher.fire();
-    dispatcher.assertIdle();
-    assertThat(flow.getHistory().top()).isEqualTo(baker);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // PROJECTS->DETAILS (set)
-    flow.set(charlie);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // forward to project details complete
-    dispatcher.fire();
-    dispatcher.assertDispatching(able);
-    assertThat(flow.getHistory().top()).isEqualTo(charlie);
-    assertThat(flow.getHistory().size()).isEqualTo(2);
-
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-
-    // forward to welcome complete
-    dispatcher.fire();
-    dispatcher.assertDispatching(baker);
-    assertThat(flow.getHistory().top()).isEqualTo(able);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-
-    Mockito.reset(dispatcher);
-    // forward to projects list complete
-    dispatcher.fire();
-    Mockito.verify(dispatcher,  Mockito.times(2)).fire();
-    dispatcher.assertIdle();
-    assertThat(flow.getHistory().top()).isEqualTo(baker);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // PROJECTS->DETAILS (set)
-    flow.set(charlie);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // forward to project details complete
-    dispatcher.fire();
-    dispatcher.assertDispatching(able);
-    assertThat(flow.getHistory().top()).isEqualTo(charlie);
-    assertThat(flow.getHistory().size()).isEqualTo(2);
-
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-
-    Mockito.reset(dispatcher);
-    // forward to welcome complete
-    dispatcher.fire();
-    Mockito.verify(dispatcher,  Mockito.times(3)).fire();
-    dispatcher.assertDispatching(baker);
-    assertThat(flow.getHistory().top()).isEqualTo(able);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-
-    Mockito.reset(dispatcher);
-    // forward to projects list complete
-    dispatcher.fire();
-    Mockito.verify(dispatcher,  Mockito.times(2)).fire();
-    dispatcher.assertIdle();
-    assertThat(flow.getHistory().top()).isEqualTo(baker);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // PROJECTS->DETAILS (set)
-    flow.set(charlie);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // forward to project details complete
-    dispatcher.fire();
-    dispatcher.assertDispatching(able);
-    assertThat(flow.getHistory().top()).isEqualTo(charlie);
-    assertThat(flow.getHistory().size()).isEqualTo(2);
-
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
-
-    Mockito.reset(dispatcher);
-    // forward to welcome complete
-    dispatcher.fire();
-    Mockito.verify(dispatcher,  Mockito.times(3)).fire();
-    dispatcher.assertDispatching(baker);
-    assertThat(flow.getHistory().top()).isEqualTo(able);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // forward to projects list complete
+    flow.set(baker);
     dispatcher.fire();
     dispatcher.assertIdle();
     assertThat(flow.getHistory().top()).isEqualTo(baker);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
-
-    // GO BACK
-    assertThat(flow.goBack()).isEqualTo(false);
-
-    // PROJECTS->DETAILS (set)
-    flow.set(charlie);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // DETAILS->WELCOME (replaceHistory FORWARD)
-    flow.replaceHistory(able, Direction.FORWARD);
-
-    // forward to project details complete
-    dispatcher.fire();
-    dispatcher.assertDispatching(able);
-    assertThat(flow.getHistory().top()).isEqualTo(charlie);
     assertThat(flow.getHistory().size()).isEqualTo(2);
 
-    // GO BACK
-    assertThat(flow.goBack()).isEqualTo(true);
+    flow.replaceHistory(History.single(charlie), Direction.REPLACE);
+    flow.goBack();
 
-    // WELCOME->PROJECTS (replaceTop FORWARD)
-    flow.replaceTop(baker, Direction.FORWARD);
+    // check clearHistory not called immediately
+    // termination should be called during pending traversal execution
+    verify(historyCallback, never()).onHistoryCleared();
 
-    Mockito.reset(dispatcher);
-    // forward to welcome complete
     dispatcher.fire();
-    Mockito.verify(dispatcher,  Mockito.times(3)).fire();
-    dispatcher.assertIdle();
-    assertThat(flow.getHistory().top()).isEqualTo(able);
-    assertThat(flow.getHistory().size()).isEqualTo(1);
+    verify(historyCallback, times(1)).onHistoryCleared();
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//    // forward to projects list complete
+//    dispatcher.fire();
+//    dispatcher.assertIdle();
+//    assertThat(flow.getHistory().top()).isEqualTo(baker);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // PROJECTS->DETAILS (set)
+//    flow.set(charlie);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // forward to project details complete
+//    dispatcher.fire();
+//    dispatcher.assertDispatching(able);
+//    assertThat(flow.getHistory().top()).isEqualTo(charlie);
+//    assertThat(flow.getHistory().size()).isEqualTo(2);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    // forward to welcome complete
+//    dispatcher.fire();
+//    dispatcher.assertDispatching(baker);
+//    assertThat(flow.getHistory().top()).isEqualTo(able);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    Mockito.reset(dispatcher);
+//    // forward to projects list complete
+//    dispatcher.fire();
+//    verify(dispatcher,  Mockito.times(2)).fire();
+//    dispatcher.assertIdle();
+//    assertThat(flow.getHistory().top()).isEqualTo(baker);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // PROJECTS->DETAILS (set)
+//    flow.set(charlie);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // forward to project details complete
+//    dispatcher.fire();
+//    dispatcher.assertDispatching(able);
+//    assertThat(flow.getHistory().top()).isEqualTo(charlie);
+//    assertThat(flow.getHistory().size()).isEqualTo(2);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    Mockito.reset(dispatcher);
+//    // forward to welcome complete
+//    dispatcher.fire();
+//    verify(dispatcher,  Mockito.times(3)).fire();
+//    dispatcher.assertDispatching(baker);
+//    assertThat(flow.getHistory().top()).isEqualTo(able);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    Mockito.reset(dispatcher);
+//    // forward to projects list complete
+//    dispatcher.fire();
+//    verify(dispatcher,  Mockito.times(2)).fire();
+//    dispatcher.assertIdle();
+//    assertThat(flow.getHistory().top()).isEqualTo(baker);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // PROJECTS->DETAILS (set)
+//    flow.set(charlie);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // forward to project details complete
+//    dispatcher.fire();
+//    dispatcher.assertDispatching(able);
+//    assertThat(flow.getHistory().top()).isEqualTo(charlie);
+//    assertThat(flow.getHistory().size()).isEqualTo(2);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    Mockito.reset(dispatcher);
+//    // forward to welcome complete
+//    dispatcher.fire();
+//    verify(dispatcher,  Mockito.times(3)).fire();
+//    dispatcher.assertDispatching(baker);
+//    assertThat(flow.getHistory().top()).isEqualTo(able);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // forward to projects list complete
+//    dispatcher.fire();
+//    dispatcher.assertIdle();
+//    assertThat(flow.getHistory().top()).isEqualTo(baker);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
+//
+//    // GO BACK
+//    assertThat(flow.goBack()).isEqualTo(false);
+//
+//    // PROJECTS->DETAILS (set)
+//    flow.set(charlie);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // DETAILS->WELCOME (replaceHistory FORWARD)
+//    flow.replaceHistory(able, Direction.FORWARD);
+//
+//    // forward to project details complete
+//    dispatcher.fire();
+//    dispatcher.assertDispatching(able);
+//    assertThat(flow.getHistory().top()).isEqualTo(charlie);
+//    assertThat(flow.getHistory().size()).isEqualTo(2);
+//
+//    // GO BACK
+//    assertThat(flow.goBack()).isEqualTo(true);
+//
+//    // WELCOME->PROJECTS (replaceTop FORWARD)
+//    flow.replaceTop(baker, Direction.FORWARD);
+//
+//    Mockito.reset(dispatcher);
+//    // forward to welcome complete
+//    dispatcher.fire();
+//    verify(dispatcher,  Mockito.times(3)).fire();
+//    dispatcher.assertIdle();
+//    assertThat(flow.getHistory().top()).isEqualTo(able);
+//    assertThat(flow.getHistory().size()).isEqualTo(1);
   }
+
+//09-12 08:56:10.633 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 1
+//09-12 08:56:10.843 7711-7711/com.sdelaysam.testflow D/WTF: forward to projects list complete 1
+
+//09-12 08:56:11.431 7711-7711/com.sdelaysam.testflow D/WTF: PROJECTS->DETAILS (set) 2
+//09-12 08:56:12.108 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 3
+
+//09-12 08:56:12.158 7711-7711/com.sdelaysam.testflow D/WTF: forward to project details complete 2
+//09-12 08:56:12.675 7711-7711/com.sdelaysam.testflow D/WTF: forward to welcome complete 3
+
+//09-12 08:56:14.487 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 4
+//09-12 08:56:14.705 7711-7711/com.sdelaysam.testflow D/WTF: forward to projects list complete 4
+
+//09-12 08:56:14.705 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 5
+//09-12 08:56:14.903 7711-7711/com.sdelaysam.testflow D/WTF: PROJECTS->DETAILS (set) 6
+//09-12 08:56:15.046 7711-7711/com.sdelaysam.testflow D/WTF: GO BACK 7
+//09-12 08:56:15.272 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 8
+//09-12 08:56:15.439 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 9
+
+//09-12 08:56:15.621 7711-7711/com.sdelaysam.testflow D/WTF: forward to project details complete 5(auto), 6
+
+//09-12 08:56:15.690 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 10
+//09-12 08:56:15.855 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 11
+//09-12 08:56:16.055 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 12
+//09-12 08:56:16.206 7711-7711/com.sdelaysam.testflow D/WTF: GO BACK 13
+//09-12 08:56:16.306 7711-7711/com.sdelaysam.testflow D/WTF: DETAILS->WELCOME (replaceHistory FORWARD) 14
+
+//09-12 08:56:16.340 7711-7711/com.sdelaysam.testflow D/WTF: back to projects list complete 7
+
+//09-12 08:56:16.506 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 15
+//09-12 08:56:16.674 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 16
+
+//09-12 08:56:16.856 7711-7711/com.sdelaysam.testflow D/WTF: forward to welcome complete 8, 9 - 12
+
+//09-12 08:56:16.874 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 17
+//09-12 08:56:17.029 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) 18
+//09-12 08:56:17.112 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD) ...
+//09-12 08:56:17.238 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:17.379 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:17.545 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:17.720 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:17.837 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:18.237 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:18.478 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:18.695 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:19.154 7711-7711/com.sdelaysam.testflow D/WTF: GO BACK
+//09-12 08:56:19.803 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:20.094 7711-7711/com.sdelaysam.testflow D/WTF: WELCOME->PROJECTS (replaceTop FORWARD)
+//09-12 08:56:20.629 7711-7711/com.sdelaysam.testflow D/WTF: GO BACK
+
+
+
 }

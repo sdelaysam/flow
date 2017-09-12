@@ -29,6 +29,8 @@ import org.mockito.Mock;
 import static flow.Direction.FORWARD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 public class ReentranceTest {
@@ -37,6 +39,7 @@ public class ReentranceTest {
   Flow flow;
   History lastStack;
   TraversalCallback lastCallback;
+  @Mock HistoryCallback historyCallback;
 
   @Before public void setUp() {
     initMocks(this);
@@ -125,10 +128,12 @@ public class ReentranceTest {
         lastStack = traversal.destination;
       }
     });
+    flow.setHistoryCallback(historyCallback);
 
     flow.set(new Detail());
     flow.set(new Error());
-    assertThat(flow.goBack()).isTrue();
+    flow.goBack();
+    verify(historyCallback, never()).onHistoryCleared();
 
     while (!callbacks.isEmpty()) {
       callbacks.poll().onTraversalCompleted();
@@ -148,11 +153,13 @@ public class ReentranceTest {
         lastStack = traversal.destination;
       }
     });
+    flow.setHistoryCallback(historyCallback);
 
     flow.set(new Detail());
 
     for (int i = 0; i < 20; i++) {
-      assertThat(flow.goBack()).isTrue();
+      flow.goBack();
+      verify(historyCallback, never()).onHistoryCleared();
     }
 
     int callbackCount = 0;

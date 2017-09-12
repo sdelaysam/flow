@@ -19,6 +19,7 @@ package flow.sample.orientation;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+
 import flow.Flow;
 
 public class OrientationSampleActivity extends Activity {
@@ -37,8 +38,6 @@ public class OrientationSampleActivity extends Activity {
   }
 
   @Override public void onBackPressed() {
-    if (!Flow.get(this).goBack()) {
-      super.onBackPressed();
-    }
+    Flow.get(this).goBack();
   }
 }

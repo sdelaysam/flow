@@ -19,6 +19,7 @@ package flow.sample.intents;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+
 import flow.Flow;
 
 public class IntentsSingleInstanceSampleActivity extends Activity {
@@ -33,8 +34,6 @@ public class IntentsSingleInstanceSampleActivity extends Activity {
   }
 
   @Override public void onBackPressed() {
-    if (!Flow.get(this).goBack()) {
-      super.onBackPressed();
-    }
+    Flow.get(this).goBack();
   }
 }

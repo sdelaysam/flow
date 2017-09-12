@@ -38,8 +38,6 @@ public class BasicSampleActivity extends Activity {
   }
 
   @Override public void onBackPressed() {
-    if (!Flow.get(this).goBack()) {
-      super.onBackPressed();
-    }
+    Flow.get(this).goBack();
   }
 }

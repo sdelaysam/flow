@@ -24,6 +24,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.view.View;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -119,6 +120,7 @@ public final class Flow {
   private HistoryFilter historyFilter = new NotPersistentHistoryFilter();
   private Dispatcher dispatcher;
   private PendingTraversal pendingTraversal;
+  private HistoryCallback historyCallback;
   private List<Object> tearDownKeys = new ArrayList<>();
   private final KeyManager keyManager;
 
@@ -177,6 +179,10 @@ public final class Flow {
     if (pendingTraversal.state != TraversalState.DISPATCHED) {
       throw new AssertionError("Hanging traversal in unexpected state " + pendingTraversal.state);
     }
+  }
+
+  void setHistoryCallback(@NonNull HistoryCallback historyCallback) {
+    this.historyCallback = historyCallback;
   }
 
   /**
@@ -282,30 +288,27 @@ public final class Flow {
   }
 
   /**
-   * Go back one key. Typically called from {@link Activity#onBackPressed()}, with
-   * the return value determining whether or not to call super. E.g.
-   * <pre>
-   * public void onBackPressed() {
-   *   if (!Flow.get(this).goBack()) {
-   *     super.onBackPressed();
-   *   }
-   * }
-   * </pre>
-   *
-   * @return false if going back is not possible.
+   * Go back one key. Typically called from {@link Activity#onBackPressed()}.
+   * If there is no way to go back, {@link HistoryCallback#onHistoryCleared()} would be triggered.
+   * Use {@link Installer#historyCallback(HistoryCallback)} to provide your own
+   * clearHistory implementation. By default, {@link Activity#finish()} would be called.
    */
-  @CheckResult public boolean goBack() {
+  public void goBack() {
     boolean canGoBack = history.size() > 1 || (pendingTraversal != null
         && pendingTraversal.state != TraversalState.FINISHED);
-    if (!canGoBack) return false;
+    if (!canGoBack) {
+      historyCallback.onHistoryCleared();
+      return;
+    }
 
     move(new PendingTraversal() {
       @Override void doExecute() {
-        if (history.size() <= 1) {
-          // The history shrank while this op was pending. It happens, let's
-          // no-op. See lengthy discussions:
-          // https://github.com/square/flow/issues/195
-          // https://github.com/square/flow/pull/197
+        if (history.size() == 0) {
+          throw new IllegalStateException("goBack() on empty history");
+        }
+        if (history.size() == 1) {
+          // https://github.com/square/flow/issues/264
+          pendingTraversal.clearHistory();
           return;
         }
 
@@ -315,7 +318,6 @@ public final class Flow {
         dispatch(newHistory, Direction.BACKWARD);
       }
     });
-    return true;
   }
 
   private void move(PendingTraversal pendingTraversal) {
@@ -436,6 +438,20 @@ public final class Flow {
 
       state = TraversalState.DISPATCHED;
       doExecute();
+    }
+
+    final void clearHistory() {
+      // Note: history top will be cleared in onDestroy() call
+      final Iterator<Object> it = tearDownKeys.iterator();
+      while (it.hasNext()) {
+        keyManager.tearDown(it.next());
+        it.remove();
+      }
+      keyManager.clearStatesExcept(Collections.emptyList());
+      next = null;
+      pendingTraversal = null;
+      state = TraversalState.FINISHED;
+      historyCallback.onHistoryCleared();
     }
 
     /**

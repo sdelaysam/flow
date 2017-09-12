@@ -32,6 +32,7 @@ public final class Installer {
   private KeyParceler parceler;
   private Object defaultKey;
   private Dispatcher dispatcher;
+  private HistoryCallback historyCallback;
 
   Installer(Context baseContext, Activity activity) {
     this.baseContext = baseContext;
@@ -50,6 +51,11 @@ public final class Installer {
 
   @NonNull public Installer defaultKey(@Nullable Object defaultKey) {
     this.defaultKey = defaultKey;
+    return this;
+  }
+
+  @NonNull public Installer historyCallback(@Nullable HistoryCallback historyCallback) {
+    this.historyCallback = historyCallback;
     return this;
   }
 
@@ -73,13 +79,23 @@ public final class Installer {
       dispatcher = KeyDispatcher.configure(activity, new DefaultKeyChanger(activity)) //
           .build();
     }
+    HistoryCallback historyCallback = this.historyCallback;
+    if (historyCallback == null) {
+      historyCallback = new HistoryCallback() {
+        @Override
+        public void onHistoryCleared() {
+          activity.finish();
+        }
+      };
+    }
+
     final Object defState = defaultKey == null ? "Hello, World!" : defaultKey;
 
     final History defaultHistory = History.single(defState);
     final Application app = (Application) baseContext.getApplicationContext();
     final KeyManager keyManager = new KeyManager(contextFactories);
     InternalLifecycleIntegration.install(app, activity, parceler, defaultHistory, dispatcher,
-        keyManager);
+        keyManager, historyCallback);
     return new InternalContextWrapper(baseContext, activity);
   }
 }

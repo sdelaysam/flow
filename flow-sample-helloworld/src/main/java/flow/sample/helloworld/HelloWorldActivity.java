@@ -19,17 +19,21 @@ package flow.sample.helloworld;
 import android.app.Activity;
 import android.content.Context;
 import flow.Flow;
+import flow.HistoryCallback;
 
-public class HelloWorldActivity extends Activity {
+public class HelloWorldActivity extends Activity implements HistoryCallback {
 
   @Override protected void attachBaseContext(Context baseContext) {
-    baseContext = Flow.configure(baseContext, this).install();
+    baseContext = Flow.configure(baseContext, this).historyCallback(this).install();
     super.attachBaseContext(baseContext);
   }
 
   @Override public void onBackPressed() {
-    if (!Flow.get(this).goBack()) {
-      super.onBackPressed();
-    }
+    Flow.get(this).goBack();
+  }
+
+  @Override
+  public void onHistoryCleared() {
+    super.onBackPressed();
   }
 }
